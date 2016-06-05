@@ -1,3 +1,5 @@
+
+
 #include <SPI.h>
 #include <Wire.h>
 #include <PID_v1.h>
@@ -11,6 +13,30 @@ Adafruit_LSM9DS0     lsm(1000);  // Use I2C, ID #1000
 
 // Create simple AHRS algorithm using the LSM9DS0 instance's accelerometer and magnetometer.
 Adafruit_Simple_AHRS ahrs(&lsm.getAccel(), &lsm.getMag());
+
+union {
+  struct stick{
+    uint16_t ROLL;
+    uint16_t PITCH;
+    uint16_t YAW;
+    uint16_t THROTTLE;
+    uint16_t AUX1;
+    uint16_t AUX2;
+    uint16_t AUX3;
+    uint16_t AUX4;
+  } 
+  m;
+  uint16_t rc_channels[8];
+  char buff[sizeof(struct stick)];
+} 
+stick_struct;
+
+char input[sizeof(stick_struct)];
+
+uint16_t ROLL = 1500;
+uint16_t PITCH = 1500;
+uint16_t YAW = 1500;
+uint16_t THROTTLE = 1000;
 
 // Function to configure the sensors on the LSM9DS0 board.
 // You don't need to change anything here, but have the option to select different
@@ -61,7 +87,7 @@ void setup(void)
 {
   Serial.begin(115200);
   Serial.println(F("Adafruit LSM9DS0 9 DOF Board AHRS Example")); Serial.println("");
-  rfBegin(11);
+  rfBegin(15);
   // Initialise the LSM9DS0 board.
   if(!lsm.begin())
   {
@@ -73,15 +99,18 @@ void setup(void)
   roll_input = 0; roll_setpoint = 0; roll_output = 0;
   yaw_input = 0; yaw_setpoint = 0; yaw_output = 0;
   pitch_input = 0; pitch_setpoint = 0; pitch_output = 0;
-  
+  Serial.println("here! 1");
   th = 0;
   // Setup the sensor gain and integration time.
   configureLSM9DS0();
+  Serial.println("here! 2");
  
   time = millis();
   //turn the PID on
   roll_PID.SetMode(AUTOMATIC);
-  //myPID.SetOutputLimits(-255, 255);
+  pitch_PID.SetMode(AUTOMATIC);
+  roll_PID.SetOutputLimits(-255, 255);
+  pitch_PID.SetOutputLimits(-255, 255);
 }
 
 void loop(void) 
@@ -90,18 +119,39 @@ void loop(void)
 
   if(rfAvailable())
   {
-      roll_setpoint = -1 * rfRead();
+//      roll_setpoint = -1 * rfRead();
+      int i = 0;
+      char c = rfRead();
+      while(c != -1 && c != '\0'){
+          Serial.print(c);
+          input[i++] = c;
+          c = rfRead();
+      }
+      //input[i] = c;      
+      memcpy(&ROLL, &input[0], sizeof(uint16_t));
+      memcpy(&PITCH, &input[2], sizeof(uint16_t));
+      memcpy(&YAW, &input[4], sizeof(uint16_t));
+      memcpy(&THROTTLE, &input[6], sizeof(uint16_t));
+//      Serial.print("#RC Roll: ");
+//      Serial.print(int(ROLL));
+//      Serial.print(" Pitch: ");
+//      Serial.print(int(PITCH));
+//      Serial.print(" Yaw: ");
+//      Serial.print(int(YAW));
+//      Serial.print(" Throttle: ");
+//      Serial.println(int(THROTTLE));
       //Serial.println(var);
   }
   
+  th = map(THROTTLE, 1000, 2000, 0, 200);
   // Use the simple AHRS function to get the current orientation.
   if (ahrs.getOrientation(&orientation) && 1)//millis() - time > 200)
   {
     time = millis();
     /* 'orientation' should have valid .roll and .pitch fields */
-    roll_input = orientation.roll;
-    yaw_input = orientation.heading;
-    pitch_input = orientation.pitch;
+    pitch_input = (int)orientation.roll;
+    yaw_input = (int)orientation.heading;
+    roll_input = (int)orientation.pitch;
     
     //roll
     double gap = abs(roll_setpoint-roll_input); //distance away from setpoint
@@ -109,7 +159,6 @@ void loop(void)
       roll_PID.SetTunings(consKp, consKi, consKd);
     else
       roll_PID.SetTunings(aggKp, aggKi, aggKd);
-    roll_PID.Compute();
     
     //pitch
     gap = abs(pitch_setpoint-pitch_input); //distance away from setpoint
@@ -117,20 +166,39 @@ void loop(void)
       pitch_PID.SetTunings(consKp, consKi, consKd);
     else
       pitch_PID.SetTunings(aggKp, aggKi, aggKd);
-    pitch_PID.Compute();
-    
-    
-    Serial.print("Roll: ");
-    Serial.print(roll_input);
-    Serial.print(" Pitch: ");
-    Serial.print(pitch_input);
-    Serial.print(" Yaw: ");
-    Serial.print(yaw_input);
-    Serial.println();
+    if(th > 5){
+      roll_PID.Compute();
+      pitch_PID.Compute();
+    }
   }
-  
-//  analogWrite(m1, th + roll_output/2 - pitch_output/2);
-//  analogWrite(m2, th - roll_output/2 - pitch_output/2);
-//  analogWrite(m3, th - roll_output/2 + pitch_output/2);
-//  analogWrite(m4, th + roll_output/2 + pitch_output/2);
-}
+//  Serial.print("*IMU Roll: ");
+//  Serial.print(roll_input);
+//  Serial.print(" Pitch: ");
+//  Serial.print(pitch_input);
+//  Serial.print(" Yaw: ");
+//  Serial.print(yaw_input);
+//  Serial.println();
+//
+//  Serial.print("roll_output: ");
+//  Serial.print(roll_output);
+//  Serial.print(" pitch_output: ");
+//  Serial.println(pitch_output);
+//
+//  Serial.print("m1: ");
+//  Serial.print((th - roll_output + pitch_output) > 0?(th - roll_output + pitch_output):0);
+//  Serial.print(" m2: ");
+//  Serial.print((th - roll_output) > 0?(th - roll_output):0);
+//  Serial.print(" m3: ");
+//  Serial.print(th);
+//  Serial.print(" m4: ");
+//  Serial.println((th + pitch_output) > 0?(th + pitch_output):0);
+//  Serial.println("_____________________________________________");
+//  
+//  
+  analogWrite(m1, (th - roll_output + pitch_output) > 0?(th - roll_output + pitch_output):0);
+  analogWrite(m2, (th - roll_output) > 0?(th - roll_output):0);
+  analogWrite(m3, th);
+  analogWrite(m4, (th + pitch_output) > 0?(th + pitch_output):0);
+  }
+
+
