@@ -76,8 +76,8 @@ double yaw_setpoint, yaw_input, yaw_output;
 double th;
 
 //Roll Coef
-double consKp = 0.2, consKi = 2, consKd = 0;
-double aggKp = 0.3, aggKi = -0.5, aggKd = 0.1;
+double consKp = 5, consKi = 0.5, consKd = 0;
+double aggKp = 5, aggKi = 0.5, aggKd = 0;
 
 PID roll_PID(&roll_input, &roll_output, &roll_setpoint, consKp, consKi, consKd, DIRECT);
 PID pitch_PID(&pitch_input, &pitch_output, &pitch_setpoint, consKp, consKi, consKd, DIRECT);
@@ -99,12 +99,9 @@ void setup(void)
   roll_input = 0; roll_setpoint = 0; roll_output = 0;
   yaw_input = 0; yaw_setpoint = 0; yaw_output = 0;
   pitch_input = 0; pitch_setpoint = 0; pitch_output = 0;
-  Serial.println("here! 1");
   th = 0;
   // Setup the sensor gain and integration time.
   configureLSM9DS0();
-  Serial.println("here! 2");
- 
   time = millis();
   //turn the PID on
   roll_PID.SetMode(AUTOMATIC);
@@ -123,7 +120,6 @@ void loop(void)
       int i = 0;
       char c = rfRead();
       while(c != -1 && c != '\0'){
-          Serial.print(c);
           input[i++] = c;
           c = rfRead();
       }
@@ -140,10 +136,10 @@ void loop(void)
 //      Serial.print(int(YAW));
 //      Serial.print(" Throttle: ");
 //      Serial.println(int(THROTTLE));
-      //Serial.println(var);
   }
   
   th = map(THROTTLE, 1000, 2000, 0, 200);
+  //th = 25;
   // Use the simple AHRS function to get the current orientation.
   if (ahrs.getOrientation(&orientation) && 1)//millis() - time > 200)
   {
@@ -155,50 +151,50 @@ void loop(void)
     
     //roll
     double gap = abs(roll_setpoint-roll_input); //distance away from setpoint
-    if (gap < 10)
+    if (gap < 5)
       roll_PID.SetTunings(consKp, consKi, consKd);
     else
       roll_PID.SetTunings(aggKp, aggKi, aggKd);
     
     //pitch
     gap = abs(pitch_setpoint-pitch_input); //distance away from setpoint
-    if (gap < 10)
+    if (gap < 5)
       pitch_PID.SetTunings(consKp, consKi, consKd);
     else
       pitch_PID.SetTunings(aggKp, aggKi, aggKd);
-    if(th > 5){
+    //if(th > 10){
       roll_PID.Compute();
       pitch_PID.Compute();
-    }
+    //}
   }
-//  Serial.print("*IMU Roll: ");
-//  Serial.print(roll_input);
-//  Serial.print(" Pitch: ");
-//  Serial.print(pitch_input);
-//  Serial.print(" Yaw: ");
-//  Serial.print(yaw_input);
-//  Serial.println();
-//
-//  Serial.print("roll_output: ");
-//  Serial.print(roll_output);
-//  Serial.print(" pitch_output: ");
-//  Serial.println(pitch_output);
-//
-//  Serial.print("m1: ");
-//  Serial.print((th - roll_output + pitch_output) > 0?(th - roll_output + pitch_output):0);
-//  Serial.print(" m2: ");
-//  Serial.print((th - roll_output) > 0?(th - roll_output):0);
-//  Serial.print(" m3: ");
-//  Serial.print(th);
-//  Serial.print(" m4: ");
-//  Serial.println((th + pitch_output) > 0?(th + pitch_output):0);
-//  Serial.println("_____________________________________________");
-//  
-//  
-  analogWrite(m1, (th - roll_output + pitch_output) > 0?(th - roll_output + pitch_output):0);
-  analogWrite(m2, (th - roll_output) > 0?(th - roll_output):0);
-  analogWrite(m3, th);
-  analogWrite(m4, (th + pitch_output) > 0?(th + pitch_output):0);
+  Serial.print("*IMU Roll: ");
+  Serial.print(roll_input);
+  Serial.print(" Pitch: ");
+  Serial.print(pitch_input);
+  Serial.print(" Yaw: ");
+  Serial.print(yaw_input);
+  Serial.println();
+
+  Serial.print("roll_output: ");
+  Serial.print(roll_output);
+  Serial.print(" pitch_output: ");
+  Serial.println(pitch_output);
+
+  Serial.print("m1: ");
+  Serial.print((th - roll_output + pitch_output) > 0?(th - roll_output + pitch_output):0);
+  Serial.print(" m2: ");
+  Serial.print((th - roll_output) > 0?(th - roll_output):0);
+  Serial.print(" m3: ");
+  Serial.print(th);
+  Serial.print(" m4: ");
+  Serial.println((th + pitch_output) > 0?(th + pitch_output):0);
+  Serial.println("_____________________________________________");
+  
+  
+  analogWrite(m1, (th - roll_output/2 + pitch_output/2) > 0?(th - roll_output/2 + pitch_output/2):0);
+  analogWrite(m2, (th - roll_output/2 - pitch_output/2) > 0?(th - roll_output/2 - pitch_output/2):0);
+  analogWrite(m3, (th + roll_output/2 - pitch_output/2) > 0?(th + roll_output/2 - pitch_output/2):0);
+  analogWrite(m4, (th + roll_output/2 + pitch_output/2) > 0?(th + roll_output/2 + pitch_output/2):0);
   }
 
 
